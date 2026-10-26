@@ -1,0 +1,115 @@
+DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Rupiah 500x500 + Lynk</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui}
+body{margin:0;background:#0f172a;color:#fff;padding:12px;max-width:520px;margin:auto}
+h1{text-align:center}
+.sub{font-size:12px;color:#94a3b8;text-align:center}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
+.stat{background:#1e293b;padding:10px;border-radius:12px;text-align:center}
+.stat b{color:#22c55e;display:block;font-size:18px}
+#canvasWrap{position:relative;width:100%;aspect-ratio:1/1;background:#fff;border-radius:12px;overflow:hidden}
+#mainCanvas{width:100%;height:100%}
+#gridOverlay{position:absolute;top:0;left:0;width:100%;height:100%;display:grid}
+.block{border:0.5px solid rgba(0,0,0,0.08)}
+.block.selected{background:rgba(34,197,94,0.8);border:1px solid #22c55e}
+.controls{background:#1e293b;padding:12px;border-radius:12px;margin-top:12px}
+input{width:100%;padding:12px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;margin-top:4px}
+.btn{width:100%;padding:16px;border:none;border-radius:12px;font-weight:900;font-size:16px;margin-top:10px;cursor:pointer}
+.btn-green{background:#22c55e;color:#fff}
+.btn-yellow{background:#facc15;color:#000}
+.btn-blue{background:#2563eb;color:#fff}
+</style>
+</head>
+<body>
+<h1>Pixel Rupiah</h1>
+<div class="sub">500x500 | Rp1.000/kotak | Bayar langsung ke Lynk.id</div>
+
+<div class="stats">
+<div class="stat">Dipilih<b id="count">0</b></div>
+<div class="stat">Total<b id="price">Rp0</b></div>
+<div class="stat">Pixel<b id="pixels">0</b></div>
+</div>
+
+<div id="canvasWrap">
+<canvas id="mainCanvas" width="500" height="500"></canvas>
+<div id="gridOverlay"></div>
+</div>
+
+<div class="controls">
+<label>Username Lynk.id lu (Shellthree_shop)</label>
+<input type="text" id="lynkUser" value="pixelrupiah" placeholder="contoh: pixelrupiah">
+
+<label>1. Pilih Foto</label>
+<input type="file" id="fileInput" accept="image/*">
+
+<button class="btn btn-green" onclick="pasangFoto()">✅ Tempel Foto di Kotak</button>
+
+<!-- TOMBOL BAYAR LYNK -->
+<button class="btn btn-yellow" id="payBtn" onclick="bayarLynk()">💳 Bayar Sekarang via Lynk.id</button>
+
+<button class="btn btn-blue" onclick="downloadHasil()">⬇️ Download 500x500 (setelah bayar)</button>
+<div id="status" style="font-size:12px;text-align:center;margin-top:8px"></div>
+</div>
+
+<canvas id="exportCanvas" width="500" height="500" style="display:none"></canvas>
+
+<script>
+const SIZE=500,BLOCK=10,COLS=50;
+const canvas=document.getElementById('mainCanvas'),ctx=canvas.getContext('2d');
+const exportCanvas=document.getElementById('exportCanvas'),exCtx=exportCanvas.getContext('2d');
+const overlay=document.getElementById('gridOverlay');
+let selectedBlocks=[],uploadedImg=null,totalBayar=0,isPaid=false;
+ctx.fillStyle='#fff';ctx.fillRect(0,0,SIZE,SIZE);
+exCtx.fillStyle='#fff';exCtx.fillRect(0,0,SIZE,SIZE);
+overlay.style.gridTemplateColumns=`repeat(${COLS},1fr)`;
+overlay.style.gridTemplateRows=`repeat(${COLS},1fr)`;
+for(let y=0;y<COLS;y++)for(let x=0;x<COLS;x++){
+ let d=document.createElement('div');d.className='block';
+ d.onclick=()=>{let i=selectedBlocks.findIndex(b=>b.x==x&&b.y==y);if(i>=0){selectedBlocks.splice(i,1);d.classList.remove('selected')}else{selectedBlocks.push({x,y});d.classList.add('selected')}updateStats()};
+ overlay.appendChild(d);
+}
+function updateStats(){
+ let c=selectedBlocks.length; totalBayar=c*1000;
+ document.getElementById('count').textContent=c;
+ document.getElementById('pixels').textContent=c*100;
+ document.getElementById('price').textContent='Rp'+totalBayar.toLocaleString('id-ID');
+ document.getElementById('payBtn').textContent=`💳 Bayar Rp${totalBayar.toLocaleString('id-ID')} via Lynk.id`;
+}
+document.getElementById('fileInput').addEventListener('change',e=>{let r=new FileReader();r.onload=ev=>{uploadedImg=new Image();uploadedImg.src=ev.target.result};r.readAsDataURL(e.target.files[0])});
+function pasangFoto(){
+ if(!uploadedImg){alert('Pilih foto dulu');return}
+ if(!selectedBlocks.length){alert('Pilih kotak dulu');return}
+ let minX=Math.min(...selectedBlocks.map(b=>b.x)),minY=Math.min(...selectedBlocks.map(b=>b.y));
+ let maxX=Math.max(...selectedBlocks.map(b=>b.x)),maxY=Math.max(...selectedBlocks.map(b=>b.y));
+ let bx=minX*BLOCK,by=minY*BLOCK,bw=(maxX-minX+1)*BLOCK,bh=(maxY-minY+1)*BLOCK;
+ ctx.drawImage(uploadedImg,bx,by,bw,bh);exCtx.drawImage(uploadedImg,bx,by,bw,bh);
+ document.getElementById('status').textContent=`✅ Terpasang! Sekarang bayar Rp${totalBayar.toLocaleString('id-ID')}`;
+ selectedBlocks=[];document.querySelectorAll('.block.selected').forEach(el=>el.classList.remove('selected'));updateStats();
+}
+function bayarLynk(){
+ if(totalBayar==0){alert('Pilih kotak dulu!');return}
+ let user=document.getElementById('lynkUser').value.trim();
+ if(!user){alert('Isi username Lynk.id lu dulu!');return}
+ // Format Lynk.id: lynk.id/username
+ // Kita kirim ke Lynk dengan catatan jumlah blok
+ let note=`PixelRupiah-${document.getElementById('count').textContent}blok-${totalBayar}`;
+ let url=`https://lynk.id/${user}`;
+ // Simpan status bayar di localStorage biar pas balik bisa download
+ localStorage.setItem('pixel_pending', totalBayar);
+ alert(`Akan buka: ${url}\n\nJangan lupa transfer Rp${totalBayar.toLocaleString('id-ID')}\nCatatan: ${note}\n\nAbis bayar, balik kesini dan pencet Download!`);
+ window.open(url, '_blank');
+ document.getElementById('status').innerHTML=`💳 Menunggu pembayaran Rp${totalBayar.toLocaleString('id-ID')} di lynk.id/${user}<br><button onclick="confirmPaid()" style="margin-top:8px;padding:8px 16px;border-radius:8px;border:none;background:#22c55e;color:#fff;font-weight:800">✅ Saya sudah bayar</button>`;
+}
+function confirmPaid(){isPaid=true;document.getElementById('status').textContent='✅ Pembayaran dikonfirmasi! Silakan download hasil 500x500';}
+function downloadHasil(){
+ if(!isPaid && totalBayar>0){if(!confirm('Belum konfirmasi bayar. Yakin mau download dulu? (Admin cek manual nanti)'))return}
+ let a=document.createElement('a');a.download=`pixel_500x500_${totalBayar}.png`;a.href=exportCanvas.toDataURL();a.click();
+}
+</script>
+</body>
+</html>
